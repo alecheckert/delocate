@@ -91,6 +91,15 @@ def main() -> None:
                     "as much as possible"
                 ),
             ),
+            Option(
+                "--exclude-libs",
+                action="store",
+                type="str",
+                default=[],
+                help=(
+                    "Comma-delimited list of libraries to exclude from delocated wheel"
+                ),
+            ),
         ]
     )
     (opts, wheels) = parser.parse_args()
@@ -117,6 +126,11 @@ def main() -> None:
     else:
         require_archs = opts.require_archs
     lib_filt_func = "dylibs-only" if opts.dylibs_only else None
+    print(f"opts.exclude_libs = {opts.exclude_libs}")
+    exclude_libs = []
+    if opts.exclude_libs:
+        exclude_libs = opts.exclude_libs.split(",")
+    print(f"exclude_libs = {exclude_libs}")
     for wheel in wheels:
         if multi or opts.verbose:
             print("Fixing: " + wheel)
@@ -132,6 +146,7 @@ def main() -> None:
             require_archs=require_archs,
             executable_path=opts.executable_path,
             ignore_missing=opts.ignore_missing_dependencies,
+            exclude_libs=exclude_libs,
         )
         if opts.verbose and len(copied):
             print("Copied to package {0} directory:".format(opts.lib_sdir))

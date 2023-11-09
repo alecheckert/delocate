@@ -59,6 +59,7 @@ def delocate_tree_libs(
     lib_dict: Mapping[Text, Mapping[Text, Text]],
     lib_path: Text,
     root_path: Text,
+    exclude_libs: list = None,
 ) -> Dict[Text, Dict[Text, Text]]:
     """Move needed libraries in `lib_dict` into `lib_path`
 
@@ -101,7 +102,7 @@ def delocate_tree_libs(
     """
     # Test for errors first to avoid getting half-way through changing the tree
     libraries_to_copy, libraries_to_delocate = _analyze_tree_libs(
-        lib_dict, root_path
+        lib_dict, root_path, exclude_libs=exclude_libs,
     )
     # Copy libraries and update lib_dict.
     lib_dict, copied_libraries = _copy_required_libs(
@@ -117,6 +118,7 @@ def delocate_tree_libs(
 def _analyze_tree_libs(
     lib_dict: Mapping[Text, Mapping[Text, Text]],
     root_path: Text,
+    exclude_libs: list = None,
 ) -> Tuple[Dict[Text, Dict[Text, Text]], Set[Text]]:
     """Verify then return which library files to copy and delocate.
 
@@ -133,6 +135,11 @@ def _analyze_tree_libs(
     copied_basenames = set()
     rp_root_path = realpath(root_path)
     for required, requirings in lib_dict.items():
+        if exclude_libs is not None:
+            bn = os.path.basename(required)
+            if any([e in bn for e in exclude_libs]):
+                print(f"skipping {required}")
+                continue
         if required.startswith("@"):
             # @rpath, etc, at this point should never happen.
             raise DelocationError("%s was expected to be resolved." % required)
@@ -403,6 +410,7 @@ def delocate_path(
     copy_filt_func: Optional[Callable[[Text], bool]] = filter_system_libs,
     executable_path: Optional[Text] = None,
     ignore_missing: bool = False,
+    exclude_libs: list = None,
 ) -> Dict[Text, Dict[Text, Text]]:
     """Copy required libraries for files in `tree_path` into `lib_path`
 
@@ -471,7 +479,7 @@ def delocate_path(
         ignore_missing=ignore_missing,
     )
 
-    return delocate_tree_libs(lib_dict, lib_path, tree_path)
+    return delocate_tree_libs(lib_dict, lib_path, tree_path, exclude_libs=exclude_libs)
 
 
 def _copy_lib_dict(
@@ -562,6 +570,7 @@ def delocate_wheel(
     check_verbose: Optional[bool] = None,
     executable_path: Optional[str] = None,
     ignore_missing: bool = False,
+    exclude_libs: list = None,
 ) -> Dict[str, Dict[str, str]]:
     """Update wheel by copying required libraries to `lib_sdir` in wheel
 
@@ -607,6 +616,7 @@ def delocate_wheel(
         An alternative path to use for resolving `@executable_path`.
     ignore_missing : bool, default=False, keyword-only
         Continue even if missing dependencies are detected.
+    exclude_libs : list of str, libraries to exclude from delocating
 
     Returns
     -------
@@ -649,6 +659,7 @@ def delocate_wheel(
             copy_filt_func,
             executable_path=executable_path,
             ignore_missing=ignore_missing,
+            exclude_libs=exclude_libs,
         )
         if copied_libs and lib_path_exists_before_delocate:
             raise DelocationError(
